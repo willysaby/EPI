@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EPI Escalade</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#237a3b">
+<script>
+  // Applique le thème mémorisé avant l'affichage (évite le flash)
+  (function(){ try { var t = localStorage.getItem('epi-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch(e){} })();
+</script>
+<style>
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#eef2f0; --text:#18211c; --muted:#5d6a63; --border:#dbe2de;
+  --accent:#237a3b; --accent-2:#2f9e44; --accent-soft:#e2f3e6; --on-accent:#ffffff;
+  --ok:#0f8a6a; --ok-soft:#dcf4ec;
+  --warn:#8a6d00; --warn-row:#fff5c2; --warn-dot:#f2c200; --warn-soft:#fff8d6;
+  --danger:#c92a2a; --danger-row:#ffdede; --danger-soft:#ffe9e9;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 6px 18px rgba(0,0,0,.06);
+  --radius:14px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#101412; --surface:#191e1b; --surface-2:#232a25; --text:#e8eeea; --muted:#98a59e; --border:#2e3631;
+    --accent:#4cc46b; --accent-2:#69d385; --accent-soft:#163020; --on-accent:#0b1f12;
+    --ok:#38d6a5; --ok-soft:#12302a;
+    --warn:#ffd43b; --warn-row:#3a3212; --warn-dot:#ffd43b; --warn-soft:#332c10;
+    --danger:#ff6b6b; --danger-row:#43201f; --danger-soft:#3a1d1d;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101412; --surface:#191e1b; --surface-2:#232a25; --text:#e8eeea; --muted:#98a59e; --border:#2e3631;
+  --accent:#4cc46b; --accent-2:#69d385; --accent-soft:#163020; --on-accent:#0b1f12;
+  --ok:#38d6a5; --ok-soft:#12302a;
+  --warn:#ffd43b; --warn-row:#3a3212; --warn-dot:#ffd43b; --warn-soft:#332c10;
+  --danger:#ff6b6b; --danger-row:#43201f; --danger-soft:#3a1d1d;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- En-tête ---------- */
+header.top{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.top-in{max-width:1200px;margin:auto;display:flex;align-items:center;gap:14px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;cursor:pointer}
+.logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(145deg,var(--accent-soft),var(--surface));border:1px solid var(--border);display:grid;place-items:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 25%,transparent)}
+.logo svg{width:40px;height:40px;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.3))}
+.brand h1{font-size:18px;margin:0;line-height:1.1;letter-spacing:-.2px}
+.brand small{color:var(--muted);font-size:12.5px}
+.top-actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;cursor:pointer;transition:.15s}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.icon-btn.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- Navigation ---------- */
+nav.tabs{display:flex;gap:4px}
+nav.tabs button{position:relative;display:flex;align-items:center;gap:7px;border:0;background:none;padding:9px 12px;border-radius:10px;cursor:pointer;color:var(--muted);font-weight:600;font-size:14px}
+nav.tabs button:hover{background:var(--surface-2);color:var(--text)}
+nav.tabs button.active{background:var(--accent-soft);color:var(--accent)}
+.badge{min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--danger);color:#fff;font-size:11px;font-weight:700;display:inline-grid;place-items:center}
+.badge.hide{display:none}
+
+main{max-width:1200px;margin:auto;padding:20px 16px 110px}
+.page{display:none}
+.page.active{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+h2.title{font-size:24px;margin:2px 0 4px;letter-spacing:-.3px}
+p.sub{color:var(--muted);margin:0 0 18px}
+
+/* ---------- Cartes et éléments ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.pad{padding:18px}
+.grid{display:grid;gap:14px}
+.stats{grid-template-columns:repeat(4,1fr)}
+.stat{padding:16px}
+.stat b{display:block;font-size:28px;line-height:1.1}
+.stat span{color:var(--muted);font-size:13px}
+.stat.warn b{color:var(--warn)} .stat.danger b{color:var(--danger)}
+.tiles{grid-template-columns:repeat(4,1fr);margin-top:14px}
+.tile{padding:18px;cursor:pointer;text-align:left;transition:.15s;border:1px solid var(--border)}
+.tile:hover{transform:translateY(-2px);border-color:var(--accent)}
+.tile .ti{width:42px;height:42px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin-bottom:10px}
+.tile b{display:block;font-size:16px}
+.tile span{color:var(--muted);font-size:13px}
+
+.notif{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:var(--radius);margin-bottom:12px;border:1px solid}
+.notif .ni{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:18px}
+.notif b{display:block;font-size:16px}
+.notif ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.notif .act{margin-left:auto;align-self:center}
+.notif.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn-dot) 55%,transparent)}
+.notif.warn .ni{background:var(--warn-dot);color:#3d2f00}
+.notif.danger{background:var(--danger-soft);border-color:color-mix(in srgb,var(--danger) 45%,transparent)}
+.notif.danger .ni{background:var(--danger);color:#fff}
+.notif.ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.notif.ok .ni{background:var(--ok);color:#fff}
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--warn-dot) 70%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+.section-h{display:flex;align-items:center;justify-content:space-between;margin:24px 0 10px}
+.section-h h3{margin:0;font-size:16px}
+.upcoming{list-style:none;margin:0;padding:0}
+.upcoming li{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--border)}
+.upcoming li:first-child{border-top:0}
+.upcoming .when{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);background:var(--surface);padding:10px 16px;border-radius:11px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.success{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.ghost{background:transparent}
+.btn.lg{padding:14px 20px;font-size:16px;border-radius:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.loading{pointer-events:none;opacity:.7}
+.btn.loading::before{content:"";width:15px;height:15px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+
+label.f{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.req::after{content:" *";color:var(--accent)}
+input.in,select.in,textarea.in{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface);outline:none;transition:.15s;min-height:44px}
+input.in:focus,select.in:focus,textarea.in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+.form{grid-template-columns:repeat(2,1fr);gap:16px 18px}
+.full{grid-column:1/-1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:1px solid var(--border);background:var(--surface-2);padding:6px 11px;border-radius:20px;font-size:13px;cursor:pointer;font-weight:600;color:var(--muted)}
+.chip:hover{color:var(--text)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.stepper{display:flex;align-items:stretch}
+.stepper button{width:46px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:20px;font-weight:700}
+.stepper button:first-child{border-radius:11px 0 0 11px}
+.stepper button:last-child{border-radius:0 11px 11px 0}
+.stepper input{border-radius:0;text-align:center;border-left:0;border-right:0}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;flex-wrap:wrap}
+
+/* ---------- Filtres ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px;margin-bottom:12px}
+.toolbar .search{flex:1 1 220px;position:relative}
+.toolbar .search svg{position:absolute;left:11px;top:12px;color:var(--muted)}
+.toolbar .search input{padding-left:38px}
+.toolbar select{flex:0 1 170px}
+.toolbar-2{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
+.count{color:var(--muted);font-size:13px;margin-left:auto}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* ---------- Tableau ---------- */
+.tbl-wrap{overflow:auto;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{position:sticky;top:0;background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:11px 12px;white-space:nowrap;cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+th.sorted{color:var(--accent)}
+th .arr{opacity:.8;margin-left:3px}
+td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr{transition:background .15s}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{filter:brightness(.97)}
+tr.l-jaune td{background:var(--warn-row)}
+tr.l-rouge td{background:var(--danger-row)}
+tr.l-jaune td:first-child{box-shadow:inset 4px 0 var(--warn-dot)}
+tr.l-rouge td:first-child{box-shadow:inset 4px 0 var(--danger)}
+tbody tr:last-child td{border-bottom:0}
+.muted{color:var(--muted)}
+.nowrap{white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.jaune{background:var(--warn-soft);color:var(--warn)}
+.pill.rouge{background:var(--danger-soft);color:var(--danger)}
+.pill.gris{background:var(--surface-2);color:var(--muted)}
+.tag{display:inline-block;padding:2px 8px;border-radius:7px;background:var(--surface-2);font-size:12.5px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.avatar{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;color:#fff;flex:none}
+.who{display:inline-flex;align-items:center;gap:8px;font-weight:600}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.empty .big{font-size:38px;margin-bottom:6px}
+
+/* ---------- Contrôle ---------- */
+.ctrl-layout{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:16px;align-items:start}
+.ctrl-list{max-height:calc(100vh - 260px);overflow:auto;padding:6px}
+.ctrl-item{width:100%;display:flex;align-items:center;gap:12px;text-align:left;border:1px solid transparent;background:none;padding:11px 12px;border-radius:12px;cursor:pointer;margin-bottom:2px}
+.ctrl-item:hover{background:var(--surface-2)}
+.ctrl-item.sel{background:var(--accent-soft);border-color:var(--accent)}
+.ctrl-item .dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--ok)}
+.ctrl-item .dot.jaune{background:var(--warn-dot)} .ctrl-item .dot.rouge{background:var(--danger)}
+.ctrl-item .main{flex:1;min-width:0}
+.ctrl-item .main b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctrl-item .main span{font-size:12.5px;color:var(--muted)}
+.panel{position:sticky;top:84px}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.detail-grid div{background:var(--surface-2);border-radius:10px;padding:9px 11px}
+.detail-grid small{display:block;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.3px}
+.checks{display:grid;gap:10px;margin:16px 0}
+.check{display:flex;align-items:center;gap:14px;padding:14px 16px;border:2px solid var(--border);border-radius:13px;cursor:pointer;transition:.15s;user-select:none}
+.check:hover{border-color:color-mix(in srgb,var(--ok) 60%,var(--border))}
+.check input{position:absolute;opacity:0;pointer-events:none}
+.check .box{width:28px;height:28px;border-radius:8px;border:2px solid var(--border);display:grid;place-items:center;transition:.15s;flex:none}
+.check .box svg{opacity:0;width:18px;height:18px;stroke:#fff;stroke-width:3}
+.check.on{border-color:var(--ok);background:var(--ok-soft)}
+.check.on .box{background:var(--ok);border-color:var(--ok)}
+.check.on .box svg{opacity:1}
+.check b{display:block}
+.check span{font-size:13px;color:var(--muted)}
+.ctrl-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ---------- Toast & dialogue ---------- */
+#toasts{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:60;display:grid;gap:8px;width:min(92vw,420px)}
+.toast{padding:12px 16px;border-radius:12px;background:#1f2622;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25);font-weight:600;animation:fade .2s}
+.toast.ok{background:var(--ok)} .toast.err{background:var(--danger)}
+dialog{border:0;border-radius:18px;padding:0;background:var(--surface);color:var(--text);width:min(92vw,420px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
+.dlg{padding:22px}
+.dlg h3{margin:0 0 8px}
+.dlg p{margin:0 0 18px;color:var(--muted)}
+.dlg .acts{display:flex;gap:10px;justify-content:flex-end}
+.demo-bar{background:var(--accent-soft);color:var(--accent);text-align:center;font-size:13px;font-weight:600;padding:6px 12px}
+.sync{font-size:12px;color:var(--muted)}
+
+/* ---------- Mobile ---------- */
+@media (max-width:900px){
+  .stats,.tiles{grid-template-columns:repeat(2,1fr)}
+  .ctrl-layout{grid-template-columns:1fr}
+  .ctrl-list{max-height:none}
+  .panel{position:static}
+}
+@media (max-width:760px){
+  .top-in nav.tabs{display:none}
+  nav.tabs.bottom{display:grid}
+  .brand h1{font-size:16px}
+  .form{grid-template-columns:1fr}
+  .detail-grid{grid-template-columns:repeat(2,1fr)}
+  h2.title{font-size:21px}
+  .toolbar select{flex:1 1 45%}
+  .notif{flex-wrap:wrap}
+  .notif .act{margin-left:52px}
+  /* Tableau -> cartes */
+  .tbl-wrap{background:none;border:0;box-shadow:none;overflow:visible}
+  table thead{display:none}
+  table,tbody,tr,td{display:block;width:100%}
+  tbody tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)}
+  td{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding:9px 14px;text-align:right}
+  td::before{content:attr(data-label);font-size:12px;font-weight:600;color:var(--muted);text-align:left}
+  td.hide-m{display:none}
+  tr.l-jaune td:first-child,tr.l-rouge td:first-child{box-shadow:none}
+  tr.l-jaune{border-left:5px solid var(--warn-dot)}
+  tr.l-rouge{border-left:5px solid var(--danger)}
+}
+nav.tabs.bottom{display:none;position:fixed;bottom:0;left:0;right:0;z-index:40;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--border);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs.bottom button{flex-direction:column;gap:3px;font-size:11px;padding:6px 2px}
+nav.tabs.bottom .badge{position:absolute;top:2px;left:calc(50% + 6px)}
+@media (max-width:760px){ nav.tabs.bottom{display:grid} }
+@media (min-width:761px){ #toasts{bottom:24px} }
+</style>
+</head>
+<body>
+
+<div id="demoBar" class="demo-bar" hidden>Mode démo : données fictives. Renseigne API_URL dans le fichier pour te connecter à ton Google Sheet.</div>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" data-go="accueil">
+      <div class="logo"><svg viewBox="0 0 64 64"><use href="#carabiner"/></svg></div>
+      <div><h1>EPI Escalade</h1><small>Le matériel de la famille</small></div>
+    </a>
+    <nav class="tabs" id="navTop"></nav>
+    <div class="top-actions">
+      <span class="sync" id="sync"></span>
+      <button class="icon-btn" id="btnRefresh" title="Actualiser"></button>
+      <button class="icon-btn" id="btnTheme" title="Mode clair / sombre"></button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ===== ACCUEIL ===== -->
+  <section class="page" id="p-accueil">
+    <h2 class="title" id="hello">Bonjour 👋</h2>
+    <p class="sub">Voici l'état du matériel d'escalade de la famille.</p>
+    <div id="notifs"></div>
+    <div class="grid stats" id="stats"></div>
+    <div class="grid tiles" id="tiles"></div>
+    <div class="section-h"><h3>Prochains contrôles</h3><button class="btn ghost" data-go="liste">Tout voir</button></div>
+    <div class="card"><ul class="upcoming" id="upcoming"></ul></div>
+  </section>
+
+  <!-- ===== LISTE ===== -->
+  <section class="page" id="p-liste">
+    <h2 class="title">Tous les EPI</h2>
+    <p class="sub">Touche une ligne pour faire son contrôle.</p>
+    <div class="card toolbar">
+      <div class="search"><svg class="i"><use href="#i-search"/></svg><input class="in" id="lQ" placeholder="Rechercher (marque, marquage…)"></div>
+      <select class="in" id="lMembre"></select>
+      <select class="in" id="lType"></select>
+      <select class="in" id="lAnnee"></select>
+    </div>
+    <div class="toolbar-2">
+      <div class="chips" id="lStatut" style="margin:0"></div>
+      <button class="btn ghost" id="lReset">Réinitialiser</button>
+      <span class="count" id="lCount"></span>
+    </div>
+    <div class="legend" style="margin-bottom:10px"><span><i style="background:var(--warn-dot)"></i>Contrôle annuel dépassé</span><span><i style="background:var(--danger)"></i>Durée de vie dépassée</span></div>
+    <div class="tbl-wrap"><table id="lTable"></table></div>
+  </section>
+
+  <!-- ===== AJOUT ===== -->
+  <section class="page" id="p-ajout">
+    <h2 class="title">Nouvel EPI</h2>
+    <p class="sub">Les champs marqués d'une * sont obligatoires.</p>
+    <form class="card pad" id="fAjout" autocomplete="off">
+      <div class="grid form">
+        <div>
+          <label class="f req" for="fMembre">Membre</label>
+          <select class="in" id="fMembre" required></select>
+          <input class="in" id="fMembreNew" placeholder="Prénom du nouveau membre" style="margin-top:8px" hidden>
+        </div>
+        <div>
+          <label class="f req" for="fEpi">Type d'EPI</label>
+          <input class="in" id="fEpi" list="dlTypes" placeholder="Baudrier, mousqueton…" required>
+          <div class="chips" id="fEpiChips"></div>
+        </div>
+        <div>
+          <label class="f" for="fMarque">Marque</label>
+          <input class="in" id="fMarque" list="dlMarques" placeholder="Petzl, Beal…">
+        </div>
+        <div>
+          <label class="f" for="fDesign">Désignation</label>
+          <input class="in" id="fDesign" placeholder="Modèle, taille, longueur…">
+        </div>
+        <div>
+          <label class="f" for="fQte">Quantité</label>
+          <div class="stepper"><button type="button" data-step="-1">−</button><input class="in" id="fQte" type="number" min="1" value="1" inputmode="numeric"><button type="button" data-step="1">+</button></div>
+        </div>
+        <div>
+          <label class="f" for="fAchat">Date d'achat</label>
+          <input class="in" id="fAchat" type="date">
+        </div>
+        <div>
+          <label class="f" for="fSite">Site d'achat</label>
+          <input class="in" id="fSite" list="dlSites" placeholder="Magasin ou site web">
+        </div>
+        <div>
+          <label class="f" for="fMarquage">Marquage</label>
+          <input class="in" id="fMarquage" placeholder="Ex. P-B01, ruban rouge…">
+          <div class="hint" id="fMarquageHint"></div>
+        </div>
+        <div>
+          <label class="f" for="fCtrl">Date du dernier contrôle</label>
+          <input class="in" id="fCtrl" type="date">
+          <div class="hint">Vide : le premier contrôle sera dû 1 an après l'achat.</div>
+        </div>
+        <div>
+          <label class="f" for="fDuree">Durée de vie (années)</label>
+          <input class="in" id="fDuree" type="number" min="0" step="0.5" placeholder="Vide = illimitée" inputmode="decimal">
+          <div class="hint" id="fDureeHint">Indique la durée donnée par la notice du fabricant.</div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" id="fVider">Vider</button>
+        <button type="submit" class="btn primary lg" id="fSave"><svg class="i"><use href="#i-plus"/></svg>Enregistrer l'EPI</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ===== CONTRÔLE ===== -->
+  <section class="page" id="p-controle">
+    <h2 class="title">Contrôle d'un EPI</h2>
+    <p class="sub">Choisis l'EPI, coche les 3 points, puis valide ou rebute.</p>
+    <div class="ctrl-layout">
+      <div class="card">
+        <div style="padding:12px 12px 4px">
+          <div class="search" style="position:relative"><svg class="i" style="position:absolute;left:11px;top:12px;color:var(--muted)"><use href="#i-search"/></svg><input class="in" id="cQ" placeholder="Rechercher un EPI, un membre, un marquage" style="padding-left:38px"></div>
+          <div class="chips" id="cMembres"></div>
+        </div>
+        <div class="ctrl-list" id="cList"></div>
+      </div>
+      <div class="card pad panel" id="cPanel"></div>
+    </div>
+  </section>
+
+  <!-- ===== REBUT ===== -->
+  <section class="page" id="p-rebut">
+    <h2 class="title">EPI rebutés</h2>
+    <p class="sub">Historique du matériel retiré du service.</p>
+    <div class="card toolbar">
+      <div class="search"><svg class="i"><use href="#i-search"/></svg><input class="in" id="rQ" placeholder="Rechercher"></div>
+      <select class="in" id="rMembre"></select>
+      <select class="in" id="rType"></select>
+      <span class="count" id="rCount"></span>
+    </div>
+    <div class="tbl-wrap"><table id="rTable"></table></div>
+  </section>
+</main>
+
+<nav class="tabs bottom" id="navBottom"></nav>
+<div id="toasts"></div>
+
+<dialog id="dlg"><div class="dlg"><h3 id="dlgT"></h3><p id="dlgP"></p><div class="acts"><button class="btn" id="dlgNo">Annuler</button><button class="btn danger" id="dlgYes">Confirmer</button></div></div></dialog>
+
+<datalist id="dlTypes"></datalist><datalist id="dlMarques"></datalist><datalist id="dlSites"></datalist>
+
+<!-- ===== Icônes ===== -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="carabiner" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="cbBody" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#a7ada9"/><stop offset=".45" stop-color="#6b726e"/><stop offset="1" stop-color="#3a3f3c"/>
+      </linearGradient>
+      <linearGradient id="cbSleeve" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#17602b"/><stop offset=".42" stop-color="#6ee08a"/><stop offset=".6" stop-color="#3fbf5f"/><stop offset="1" stop-color="#14552a"/>
+      </linearGradient>
+    </defs>
+    <!-- corps en poire -->
+    <path d="M18.5 16C20.5 8.5 28 5 36.5 5 47 5 55.5 10.5 55.5 19.5c0 6.5-4.5 15.5-10.5 25C40.8 51.2 36.5 57.5 30 58.5c-5 .6-8.6-1.8-9.6-6.5" fill="none" stroke="#202422" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18.5 16C20.5 8.5 28 5 36.5 5 47 5 55.5 10.5 55.5 19.5c0 6.5-4.5 15.5-10.5 25C40.8 51.2 36.5 57.5 30 58.5c-5 .6-8.6-1.8-9.6-6.5" fill="none" stroke="url(#cbBody)" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22 11.5C25 8 30 6.6 36.5 6.6 45.5 6.6 52.6 11 53.6 18" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M38 9.5h6M47.5 12l3 2.5" stroke="#202422" stroke-opacity=".55" stroke-width="1.2" stroke-linecap="round"/>
+    <!-- doigt -->
+    <path d="M18.6 15.5 20.3 51" stroke="#151817" stroke-width="5" stroke-linecap="round"/>
+    <!-- bague de verrouillage -->
+    <g transform="rotate(-2.7 19.5 33)">
+      <rect x="14.2" y="21.5" width="10.6" height="22.5" rx="2.8" fill="url(#cbSleeve)" stroke="#0f3f1d" stroke-width=".9"/>
+      <rect x="14.2" y="21.5" width="10.6" height="3.6" rx="1.6" fill="#2f9e44" stroke="#0f3f1d" stroke-width=".7"/>
+      <rect x="14.2" y="40.4" width="10.6" height="3.6" rx="1.6" fill="#2f9e44" stroke="#0f3f1d" stroke-width=".7"/>
+      <path d="M14.8 27.2h9.4M14.8 29.4h9.4M14.8 31.6h9.4M14.8 33.8h9.4M14.8 36h9.4M14.8 38.2h9.4" stroke="#0f3f1d" stroke-opacity=".45" stroke-width=".8"/>
+      <rect x="16.2" y="25.6" width="1.6" height="14.2" rx=".8" fill="#fff" fill-opacity=".35"/>
+    </g>
+    <!-- rivet -->
+    <circle cx="20.5" cy="51.2" r="1.9" fill="#d4d8d5" stroke="#202422" stroke-width=".8"/>
+  </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+</svg>
+
+<script>
+/* =========================================================
+   CONFIGURATION : colle ici l'URL /exec de ton Apps Script
+   (laisser vide = mode démo avec des données fictives)
+   ========================================================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycbxM8hYhsBR0Ig63xvMyoYLeb67V0RkSL-VyVQUW451RW4Y7LtnDHXAzFKWUVaXgXzrc/exec';
+
+const DEMO = !API_URL;
+const CONTROLE_ANS = 1; // périodicité du contrôle
+
+// Types proposés + durée de vie suggérée (à vérifier sur la notice)
+const DUREES = {
+  'Baudrier': 10, 'Casque': 10, 'Corde': 10, 'Longe': 10, 'Dégaine': 10,
+  'Sangle / anneau': 10, 'Cordelette': 10, 'Mousqueton': '', "Système d'assurage": '',
+  'Poulie': '', 'Autre': ''
+};
+const TYPES = Object.keys(DUREES);
+const COULEURS = ['#e8590c','#1c7ed6','#2b8a3e','#ae3ec9','#d6336c','#0c8599','#f08c00','#5f3dc4'];
+
+let DATA = { epis: [], rebuts: [], membres: [] };
+let lastSync = null;
+const S = {
+  page: 'accueil',
+  tri: { cle: 'statut', dir: 1 },
+  f: { q: '', membre: '', type: '', annee: '', statut: '' },
+  r: { q: '', membre: '', type: '' },
+  c: { q: '', membre: '', sel: null, checks: { mecanisme: false, textile: false, general: false } },
+  dureeTouchee: false
+};
+
+/* ---------- Outils ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function auj() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function parseD(s) { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fr(s) { if (!s) return '—'; const d = typeof s === 'string' ? parseD(s) : s; return d.toLocaleDateString('fr-FR'); }
+function plusAns(d, a) { const r = new Date(d); r.setMonth(r.getMonth() + Math.round(Number(a) * 12)); return r; }
+function jours(d) { return Math.round((d - auj()) / 86400000); }
+function relatif(d) {
+  const j = jours(d);
+  if (j === 0) return "aujourd'hui";
+  if (j > 0) return j < 60 ? `dans ${j} j` : `dans ${Math.round(j / 30)} mois`;
+  return -j < 60 ? `depuis ${-j} j` : `depuis ${Math.round(-j / 30)} mois`;
+}
+function couleur(nom) { const i = DATA.membres.indexOf(nom); return COULEURS[(i < 0 ? nom.length : i) % COULEURS.length]; }
+function avatar(nom) { return `<span class="who"><span class="avatar" style="background:${couleur(nom)}">${esc((nom || '?').charAt(0).toUpperCase())}</span>${esc(nom)}</span>`; }
+function nomEpi(e) { return [e.epi, e.marque, e.designation].filter(Boolean).join(' · '); }
+
+/* ---------- Statut d'un EPI : ok / jaune / rouge ---------- */
+function statut(e) {
+  const t = auj();
+  const r = { niveau: 'ok', prochain: null, fin: null, retard: false, jamais: !e.controle };
+  if (e.duree !== '' && e.duree != null && e.achat) {
+    r.fin = plusAns(parseD(e.achat), e.duree);
+    if (r.fin < t) r.niveau = 'rouge';
+  }
+  const ref = e.controle || e.achat;
+  if (ref) { r.prochain = plusAns(parseD(ref), CONTROLE_ANS); r.retard = r.prochain < t; }
+  else r.retard = true; // aucune date : à contrôler
+  if (r.retard && r.niveau !== 'rouge') r.niveau = 'jaune';
+  return r;
+}
+function pillStatut(st) {
+  if (st.niveau === 'rouge') return '<span class="pill rouge">Fin de vie</span>';
+  if (st.niveau === 'jaune') return `<span class="pill jaune">${st.jamais && !st.prochain ? 'À contrôler' : 'Contrôle en retard'}</span>`;
+  return '<span class="pill ok">À jour</span>';
+}
+
+/* ---------- API ---------- */
+async function api(action, payload = {}) {
+  if (DEMO) return demoApi(action, payload);
+  let res;
+  if (action === 'all') res = await fetch(API_URL + '?action=all');
+  else res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, ...payload }) });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || 'Erreur inconnue');
+  return j;
+}
+function appliquer(data) {
+  DATA = data; lastSync = new Date();
+  if (!DEMO) { try { localStorage.setItem('epi-cache', JSON.stringify(DATA)); } catch (e) {} }
+  renderAll();
+}
+async function charger() {
+  const b = $('#btnRefresh'); b.classList.add('spin');
+  try { const j = await api('all'); appliquer(j.data); }
+  catch (e) { toast('Connexion impossible : ' + e.message, 'err'); }
+  finally { b.classList.remove('spin'); }
+}
+
+/* ---------- Mode démo ---------- */
+let DB = null;
+function demoInit() {
+  const t = auj();
+  const a = (y, m = 0, d = 0) => { const x = new Date(t); x.setFullYear(x.getFullYear() - y); x.setMonth(x.getMonth() - m); x.setDate(x.getDate() - d); return iso(x); };
+  DB = {
+    membres: ['Papa', 'Maman', 'Léo', 'Jade'],
+    epis: [
+      { membre: 'Papa', epi: 'Baudrier', marque: 'Petzl', designation: 'Corax taille 2', quantite: 1, achat: a(3), site: 'Au Vieux Campeur', marquage: 'P-B01', controle: a(0, 4), duree: 10 },
+      { membre: 'Papa', epi: 'Corde', marque: 'Beal', designation: 'Joker 9,1 mm 70 m', quantite: 1, achat: a(10, 3), site: 'Decathlon', marquage: 'P-C01', controle: a(0, 7), duree: 10 },
+      { membre: 'Maman', epi: 'Casque', marque: 'Black Diamond', designation: 'Half Dome', quantite: 1, achat: a(2, 2), site: 'Snowleader', marquage: 'M-K01', controle: a(1, 1), duree: 10 },
+      { membre: 'Maman', epi: 'Mousqueton', marque: 'Petzl', designation: 'Attache à vis', quantite: 3, achat: a(4), site: 'Decathlon', marquage: 'M-M01', controle: a(0, 8), duree: '' },
+      { membre: 'Léo', epi: 'Baudrier', marque: 'Edelrid', designation: 'Finn III enfant', quantite: 1, achat: a(1, 3), site: 'Ekosport', marquage: 'L-B01', controle: '', duree: 10 },
+      { membre: 'Jade', epi: "Système d'assurage", marque: 'Petzl', designation: 'GriGri', quantite: 1, achat: a(0, 6), site: 'Au Vieux Campeur', marquage: 'J-A01', controle: '', duree: '' },
+      { membre: 'Jade', epi: 'Dégaine', marque: 'Camp', designation: 'Orbit Express 11 cm', quantite: 6, achat: a(5), site: 'Decathlon', marquage: 'J-D01', controle: a(0, 0, 345), duree: 10 }
+    ],
+    rebuts: [
+      { membre: 'Papa', epi: 'Longe', marque: 'Petzl', designation: 'Connect Adjust', quantite: 1, achat: a(9), site: 'Decathlon', marquage: 'P-L01', dateRebut: a(0, 5) }
+    ]
+  };
+}
+function demoApi(action, p) {
+  if (!DB) demoInit();
+  return new Promise((ok, ko) => setTimeout(() => {
+    try {
+      if (action === 'ajouterEpi') {
+        DB.epis.push({ ...p.epi, quantite: Number(p.epi.quantite) || 1, duree: p.epi.duree === '' ? '' : Number(p.epi.duree) });
+        if (!DB.membres.includes(p.epi.membre)) DB.membres.push(p.epi.membre);
+      } else if (action === 'controle') {
+        const i = p.row - 2, e = DB.epis[i];
+        if (!e || e.marquage !== p.marquage) throw new Error('EPI introuvable');
+        if (p.resultat === 'valide') e.controle = iso(auj());
+        else { const { controle, duree, ...reste } = e; DB.rebuts.push({ ...reste, dateRebut: iso(auj()) }); DB.epis.splice(i, 1); }
+      }
+      ok({ ok: true, data: JSON.parse(JSON.stringify({ epis: DB.epis.map((e, i) => ({ ...e, row: i + 2 })), rebuts: DB.rebuts.map((e, i) => ({ ...e, row: i + 2 })), membres: DB.membres })) });
+    } catch (e) { ko(e); }
+  }, 300));
+}
+
+/* ---------- Navigation ---------- */
+const PAGES = [
+  ['accueil', 'Accueil', 'home'], ['liste', 'Les EPI', 'list'], ['ajout', 'Ajouter', 'plus'],
+  ['controle', 'Contrôle', 'shield'], ['rebut', 'Rebut', 'trash']
+];
+function buildNav() {
+  const html = PAGES.map(([id, lib, i]) => `<button data-go="${id}">${ic(i)}<span>${lib}</span>${id === 'controle' ? '<span class="badge hide" data-badge></span>' : ''}</button>`).join('');
+  $('#navTop').innerHTML = html; $('#navBottom').innerHTML = html;
+}
+function go(page, opts = {}) {
+  S.page = page;
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === 'p-' + page));
+  $$('[data-go]').forEach(b => b.classList.toggle('active', b.dataset.go === page && b.tagName === 'BUTTON' && !!b.closest('nav')));
+  if (opts.statut !== undefined) { S.f = { q: '', membre: '', type: '', annee: '', statut: opts.statut }; $('#lQ').value = ''; renderListe(); }
+  if (opts.sel !== undefined) { selectionner(opts.sel); }
+  if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-go]');
+  if (b) { e.preventDefault(); go(b.dataset.go, b.dataset.statut !== undefined ? { statut: b.dataset.statut } : {}); }
+});
+
+/* ---------- Thème ---------- */
+function themeActuel() {
+  return document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+}
+function majBoutonTheme() { $('#btnTheme').innerHTML = ic(themeActuel() === 'dark' ? 'sun' : 'moon'); }
+$('#btnTheme').onclick = () => {
+  const t = themeActuel() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('epi-theme', t); } catch (e) {}
+  majBoutonTheme();
+};
+$('#btnRefresh').innerHTML = ic('refresh');
+$('#btnRefresh').onclick = charger;
+
+/* ---------- Toast & confirmation ---------- */
+function toast(msg, type = '') {
+  const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
+  $('#toasts').appendChild(t); setTimeout(() => t.remove(), 3500);
+}
+function confirmer(titre, texte, libelle) {
+  return new Promise(res => {
+    const d = $('#dlg'); $('#dlgT').textContent = titre; $('#dlgP').textContent = texte; $('#dlgYes').textContent = libelle;
+    const fin = v => { d.close(); res(v); };
+    $('#dlgYes').onclick = () => fin(true); $('#dlgNo').onclick = () => fin(false);
+    d.oncancel = () => res(false);
+    d.showModal();
+  });
+}
+function chargement(btn, on) { btn.classList.toggle('loading', on); btn.disabled = on; }
+
+/* ---------- Rendu global ---------- */
+function renderAll() {
+  renderAccueil(); renderOptions(); renderListe(); renderControle(); renderRebut();
+  $('#sync').textContent = lastSync ? 'Mis à jour ' + lastSync.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+/* ---------- Accueil ---------- */
+function renderAccueil() {
+  const h = new Date().getHours();
+  $('#hello').textContent = (h < 18 ? 'Bonjour' : 'Bonsoir') + ' 👋';
+  const avec = DATA.epis.map(e => ({ e, st: statut(e) }));
+  const retard = avec.filter(x => x.st.retard && x.st.niveau !== 'rouge');
+  const rouges = avec.filter(x => x.st.niveau === 'rouge');
+  const nbAlertes = retard.length + rouges.length;
+
+  $$('[data-badge]').forEach(b => { b.textContent = nbAlertes; b.classList.toggle('hide', !nbAlertes); });
+  document.title = (nbAlertes ? `(${nbAlertes}) ` : '') + 'EPI Escalade';
+
+  const liste = arr => '<ul>' + arr.slice(0, 4).map(x => `<li>${esc(nomEpi(x.e))} de <b style="display:inline">${esc(x.e.membre)}</b></li>`).join('') + (arr.length > 4 ? `<li>et ${arr.length - 4} autre(s)…</li>` : '') + '</ul>';
+  let n = '';
+  if (rouges.length) n += `<div class="notif danger"><div class="ni">⛔</div><div><b>${rouges.length} EPI ${rouges.length > 1 ? 'ont' : 'a'} dépassé ${rouges.length > 1 ? 'leur' : 'sa'} durée de vie</b>${liste(rouges)}</div><button class="btn danger act" data-go="liste" data-statut="rouge">Voir</button></div>`;
+  if (retard.length) n += `<div class="notif warn"><div class="ni pulse">⚠️</div><div><b>${retard.length} EPI ${retard.length > 1 ? 'ne sont pas contrôlés' : "n'est pas contrôlé"} dans les temps</b>${liste(retard)}</div><button class="btn primary act" data-go="controle">Contrôler</button></div>`;
+  if (!n && DATA.epis.length) n = `<div class="notif ok"><div class="ni">✓</div><div><b>Tout est en ordre</b><span class="muted">Tous les EPI sont contrôlés et dans leur durée de vie.</span></div></div>`;
+  $('#notifs').innerHTML = n;
+
+  const pieces = DATA.epis.reduce((s, e) => s + (Number(e.quantite) || 1), 0);
+  $('#stats').innerHTML = `
+    <div class="card stat"><b>${DATA.epis.length}</b><span>EPI en service (${pieces} pièce${pieces > 1 ? 's' : ''})</span></div>
+    <div class="card stat ${retard.length ? 'warn' : ''}"><b>${retard.length}</b><span>Contrôle${retard.length > 1 ? 's' : ''} en retard</span></div>
+    <div class="card stat ${rouges.length ? 'danger' : ''}"><b>${rouges.length}</b><span>En fin de vie</span></div>
+    <div class="card stat"><b>${DATA.rebuts.length}</b><span>Rebutés</span></div>`;
+
+  $('#tiles').innerHTML = [
+    ['ajout', 'plus', 'Ajouter un EPI', 'Enregistrer un nouvel achat'],
+    ['liste', 'list', 'Voir les EPI', 'Filtrer par membre, type, date'],
+    ['controle', 'shield', 'Faire un contrôle', 'Valider ou rebuter un EPI'],
+    ['rebut', 'trash', 'EPI rebutés', 'Historique du matériel retiré']
+  ].map(([p, i, t, s]) => `<button class="card tile" data-go="${p}"><div class="ti">${ic(i)}</div><b>${t}</b><span>${s}</span></button>`).join('');
+
+  const prochains = avec.filter(x => !x.st.retard && x.st.niveau !== 'rouge' && x.st.prochain)
+    .sort((a, b) => a.st.prochain - b.st.prochain).slice(0, 5);
+  $('#upcoming').innerHTML = prochains.length
+    ? prochains.map(x => `<li>${avatar(x.e.membre)}<span>${esc(nomEpi(x.e))}</span><span class="when">${fr(iso(x.st.prochain))} · ${relatif(x.st.prochain)}</span></li>`).join('')
+    : `<li class="muted">${DATA.epis.length ? 'Aucun contrôle à venir hors retards.' : 'Aucun EPI enregistré pour le moment.'}</li>`;
+}
+
+/* ---------- Options des listes déroulantes ---------- */
+function setOptions(sel, items, tous) {
+  const v = sel.value;
+  sel.innerHTML = `<option value="">${tous}</option>` + items.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  sel.value = items.includes(v) ? v : '';
+}
+const uniques = arr => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+function renderOptions() {
+  const types = uniques([...TYPES, ...DATA.epis.map(e => e.epi), ...DATA.rebuts.map(e => e.epi)]);
+  setOptions($('#lMembre'), DATA.membres, 'Tous les membres');
+  setOptions($('#lType'), uniques(DATA.epis.map(e => e.epi)), 'Tous les EPI');
+  setOptions($('#lAnnee'), uniques(DATA.epis.map(e => (e.achat || '').slice(0, 4))).reverse(), "Toutes les années d'achat");
+  setOptions($('#rMembre'), uniques(DATA.rebuts.map(e => e.membre)), 'Tous les membres');
+  setOptions($('#rType'), uniques(DATA.rebuts.map(e => e.epi)), 'Tous les EPI');
+  $('#dlTypes').innerHTML = types.map(t => `<option value="${esc(t)}">`).join('');
+  $('#dlMarques').innerHTML = uniques([...DATA.epis, ...DATA.rebuts].map(e => e.marque)).map(t => `<option value="${esc(t)}">`).join('');
+  $('#dlSites').innerHTML = uniques([...DATA.epis, ...DATA.rebuts].map(e => e.site)).map(t => `<option value="${esc(t)}">`).join('');
+
+  const fm = $('#fMembre'), v = fm.value;
+  fm.innerHTML = '<option value="" disabled>Choisir…</option>' + DATA.membres.map(m => `<option>${esc(m)}</option>`).join('') + '<option value="__new__">＋ Nouveau membre…</option>';
+  fm.value = DATA.membres.includes(v) || v === '__new__' ? v : '';
+  $('#fEpiChips').innerHTML = TYPES.filter(t => t !== 'Autre').map(t => `<button type="button" class="chip" data-type="${esc(t)}">${esc(t)}</button>`).join('');
+  majChipsType();
+}
+
+/* ---------- Liste des EPI ---------- */
+const COLS = [
+  ['statut', 'Statut'], ['membre', 'Membre'], ['epi', 'EPI'], ['marque', 'Marque'], ['designation', 'Désignation'],
+  ['quantite', 'Qté'], ['achat', 'Achat'], ['site', "Site d'achat"], ['marquage', 'Marquage'],
+  ['controle', 'Dernier contrôle'], ['prochain', 'Prochain contrôle'], ['fin', 'Fin de vie']
+];
+const ORDRE = { rouge: 0, jaune: 1, ok: 2 };
+function valeurTri(x, cle) {
+  if (cle === 'statut') return ORDRE[x.st.niveau] * 1e13 + (x.st.prochain ? +x.st.prochain : 0);
+  if (cle === 'prochain') return x.st.prochain ? +x.st.prochain : 0;
+  if (cle === 'fin') return x.st.fin ? +x.st.fin : Infinity;
+  if (cle === 'quantite') return Number(x.e.quantite) || 0;
+  return norm(x.e[cle]);
+}
+function renderListe() {
+  const f = S.f, q = norm(f.q);
+  let rows = DATA.epis.map(e => ({ e, st: statut(e) })).filter(({ e, st }) =>
+    (!f.membre || e.membre === f.membre) && (!f.type || e.epi === f.type) &&
+    (!f.annee || (e.achat || '').startsWith(f.annee)) &&
+    (!f.statut || (f.statut === 'retard' ? st.niveau !== 'ok' : st.niveau === f.statut)) &&
+    (!q || norm([e.membre, e.epi, e.marque, e.designation, e.marquage, e.site].join(' ')).includes(q)));
+  const { cle, dir } = S.tri;
+  rows.sort((a, b) => { const va = valeurTri(a, cle), vb = valeurTri(b, cle); return (va > vb ? 1 : va < vb ? -1 : 0) * dir; });
+
+  $('#lStatut').innerHTML = [['', 'Tous'], ['retard', 'À traiter'], ['jaune', 'Contrôle en retard'], ['rouge', 'Fin de vie'], ['ok', 'À jour']]
+    .map(([v, l]) => `<button class="chip ${f.statut === v ? 'on' : ''}" data-st="${v}">${l}</button>`).join('');
+  $('#lCount').textContent = `${rows.length} EPI affiché${rows.length > 1 ? 's' : ''} sur ${DATA.epis.length}`;
+
+  const head = '<thead><tr>' + COLS.map(([k, l]) => `<th data-sort="${k}" class="${cle === k ? 'sorted' : ''}">${l}${cle === k ? `<span class="arr">${dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('') + '</tr></thead>';
+  const body = rows.length ? rows.map(({ e, st }) => `
+    <tr class="click l-${st.niveau === 'ok' ? 'ok' : st.niveau}" data-row="${e.row}" title="Contrôler cet EPI">
+      <td data-label="Statut">${pillStatut(st)}</td>
+      <td data-label="Membre">${avatar(e.membre)}</td>
+      <td data-label="EPI"><b>${esc(e.epi)}</b></td>
+      <td data-label="Marque">${esc(e.marque) || '<span class="muted">—</span>'}</td>
+      <td data-label="Désignation">${esc(e.designation) || '<span class="muted">—</span>'}</td>
+      <td data-label="Quantité">${esc(e.quantite)}</td>
+      <td data-label="Achat" class="nowrap">${fr(e.achat)}</td>
+      <td data-label="Site d'achat" class="${e.site ? '' : 'hide-m'}">${esc(e.site) || '<span class="muted">—</span>'}</td>
+      <td data-label="Marquage">${e.marquage ? `<span class="tag">${esc(e.marquage)}</span>` : '<span class="muted">—</span>'}</td>
+      <td data-label="Dernier contrôle" class="nowrap">${e.controle ? fr(e.controle) : '<span class="muted">Jamais</span>'}</td>
+      <td data-label="Prochain contrôle" class="nowrap">${st.prochain ? `${fr(iso(st.prochain))}<br><small class="muted">${relatif(st.prochain)}</small>` : '—'}</td>
+      <td data-label="Fin de vie" class="nowrap">${st.fin ? `${fr(iso(st.fin))}${st.niveau === 'rouge' ? `<br><small style="color:var(--danger)">dépassée ${relatif(st.fin)}</small>` : ''}` : '<span class="muted">Illimitée</span>'}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="${COLS.length}"><div class="empty"><div class="big">🧗</div>${DATA.epis.length ? 'Aucun EPI ne correspond à ces filtres.' : 'Aucun EPI pour le moment. Ajoute le premier !'}</div></td></tr>`;
+  $('#lTable').innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+$('#lTable').addEventListener('click', e => {
+  const th = e.target.closest('th[data-sort]');
+  if (th) { const k = th.dataset.sort; S.tri = { cle: k, dir: S.tri.cle === k ? -S.tri.dir : 1 }; renderListe(); return; }
+  const tr = e.target.closest('tr[data-row]');
+  if (tr) go('controle', { sel: Number(tr.dataset.row) });
+});
+$('#lQ').oninput = e => { S.f.q = e.target.value; renderListe(); };
+$('#lMembre').onchange = e => { S.f.membre = e.target.value; renderListe(); };
+$('#lType').onchange = e => { S.f.type = e.target.value; renderListe(); };
+$('#lAnnee').onchange = e => { S.f.annee = e.target.value; renderListe(); };
+$('#lStatut').onclick = e => { const c = e.target.closest('[data-st]'); if (c) { S.f.statut = c.dataset.st; renderListe(); } };
+$('#lReset').onclick = () => { S.f = { q: '', membre: '', type: '', annee: '', statut: '' }; $('#lQ').value = ''; $('#lMembre').value = ''; $('#lType').value = ''; $('#lAnnee').value = ''; renderListe(); };
+
+/* ---------- Ajout d'un EPI ---------- */
+function majChipsType() { const v = $('#fEpi').value; $$('#fEpiChips .chip').forEach(c => c.classList.toggle('on', c.dataset.type === v)); }
+function suggererDuree() {
+  const t = $('#fEpi').value;
+  if (t in DUREES && !S.dureeTouchee) {
+    $('#fDuree').value = DUREES[t];
+    $('#fDureeHint').textContent = DUREES[t] ? `Suggestion : ${DUREES[t]} ans pour un ${t.toLowerCase()} (vérifie la notice).` : 'Métal : durée souvent illimitée tant que le contrôle est bon (vérifie la notice).';
+  }
+  majChipsType();
+}
+$('#fEpiChips').onclick = e => { const c = e.target.closest('[data-type]'); if (c) { $('#fEpi').value = c.dataset.type; suggererDuree(); } };
+$('#fEpi').oninput = suggererDuree;
+$('#fDuree').oninput = () => { S.dureeTouchee = true; };
+$('#fMembre').onchange = e => { const n = e.target.value === '__new__'; $('#fMembreNew').hidden = !n; if (n) $('#fMembreNew').focus(); };
+$$('.stepper button').forEach(b => b.onclick = () => { const i = $('#fQte'); i.value = Math.max(1, (Number(i.value) || 1) + Number(b.dataset.step)); });
+$('#fMarquage').oninput = e => {
+  const v = norm(e.target.value.trim());
+  const dbl = v && DATA.epis.find(x => norm(x.marquage) === v);
+  $('#fMarquageHint').innerHTML = dbl ? `<span style="color:var(--warn)">⚠ Marquage déjà utilisé : ${esc(nomEpi(dbl))} (${esc(dbl.membre)})</span>` : '';
+};
+function viderForm(garder) {
+  const m = $('#fMembre').value, t = $('#fEpi').value;
+  $('#fAjout').reset();
+  $('#fAchat').value = iso(auj());
+  $('#fMembreNew').hidden = true; $('#fMarquageHint').innerHTML = '';
+  $('#fDureeHint').textContent = 'Indique la durée donnée par la notice du fabricant.';
+  S.dureeTouchee = false;
+  if (garder) { $('#fMembre').value = DATA.membres.includes(m) ? m : ''; $('#fEpi').value = t; suggererDuree(); }
+  majChipsType();
+}
+$('#fVider').onclick = () => viderForm(false);
+$('#fAjout').onsubmit = async ev => {
+  ev.preventDefault();
+  let membre = $('#fMembre').value;
+  if (membre === '__new__') membre = $('#fMembreNew').value.trim();
+  if (!membre) { toast('Choisis un membre', 'err'); return; }
+  const epi = $('#fEpi').value.trim();
+  if (!epi) { toast("Indique le type d'EPI", 'err'); $('#fEpi').focus(); return; }
+  if ($('#fCtrl').value && $('#fAchat').value && $('#fCtrl').value < $('#fAchat').value) { toast("Le dernier contrôle ne peut pas précéder l'achat", 'err'); return; }
+  const data = {
+    membre, epi, marque: $('#fMarque').value.trim(), designation: $('#fDesign').value.trim(),
+    quantite: Number($('#fQte').value) || 1, achat: $('#fAchat').value, site: $('#fSite').value.trim(),
+    marquage: $('#fMarquage').value.trim(), controle: $('#fCtrl').value, duree: $('#fDuree').value
+  };
+  const b = $('#fSave'); chargement(b, true);
+  try {
+    const j = await api('ajouterEpi', { epi: data });
+    appliquer(j.data);
+    toast(`✓ ${epi} enregistré pour ${membre}`, 'ok');
+    $('#fMembre').value = membre;
+    viderForm(true);
+  } catch (e) { toast('Erreur : ' + e.message, 'err'); }
+  finally { chargement(b, false); }
+};
+
+/* ---------- Contrôle ---------- */
+function epiParRow(row) { return DATA.epis.find(e => e.row === row); }
+function selectionner(row) {
+  S.c.sel = row; S.c.checks = { mecanisme: false, textile: false, general: false };
+  renderControle();
+  if (window.innerWidth <= 900 && row) setTimeout(() => $('#cPanel').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+function renderControle() {
+  const q = norm(S.c.q);
+  $('#cMembres').innerHTML = ['', ...DATA.membres].map(m => `<button class="chip ${S.c.membre === m ? 'on' : ''}" data-m="${esc(m)}">${m ? esc(m) : 'Tous'}</button>`).join('');
+  const items = DATA.epis.map(e => ({ e, st: statut(e) }))
+    .filter(({ e }) => (!S.c.membre || e.membre === S.c.membre) && (!q || norm([e.membre, e.epi, e.marque, e.designation, e.marquage].join(' ')).includes(q)))
+    .sort((a, b) => ORDRE[a.st.niveau] - ORDRE[b.st.niveau] || (a.st.prochain || 0) - (b.st.prochain || 0));
+  $('#cList').innerHTML = items.length ? items.map(({ e, st }) => `
+    <button class="ctrl-item ${S.c.sel === e.row ? 'sel' : ''}" data-row="${e.row}">
+      <span class="dot ${st.niveau}"></span>
+      <span class="main"><b>${esc(nomEpi(e))}</b><span>${esc(e.membre)}${e.marquage ? ' · ' + esc(e.marquage) : ''} · ${st.prochain ? (st.retard ? 'en retard ' + relatif(st.prochain) : 'contrôle ' + relatif(st.prochain)) : 'jamais contrôlé'}</span></span>
+      ${e.marquage ? `<span class="tag">${esc(e.marquage)}</span>` : ''}
+    </button>`).join('') : '<div class="empty">Aucun EPI trouvé.</div>';
+
+  const e = epiParRow(S.c.sel);
+  if (!e) { S.c.sel = null; $('#cPanel').innerHTML = `<div class="empty"><div class="big">🪢</div>Sélectionne un EPI dans la liste pour commencer le contrôle.</div>`; return; }
+  const st = statut(e), c = S.c.checks, tous = c.mecanisme && c.textile && c.general;
+  const box = (k, t, s) => `<label class="check ${c[k] ? 'on' : ''}"><input type="checkbox" data-k="${k}" ${c[k] ? 'checked' : ''}><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></span><span><b>${t}</b><span>${s}</span></span></label>`;
+  $('#cPanel').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${avatar(e.membre)}${pillStatut(st)}</div>
+    <h3 style="margin:12px 0 0;font-size:20px">${esc(nomEpi(e))}</h3>
+    <div class="detail-grid">
+      <div><small>Marquage</small>${e.marquage ? `<span class="tag">${esc(e.marquage)}</span>` : '—'}</div>
+      <div><small>Quantité</small>${esc(e.quantite)}</div>
+      <div><small>Achat</small>${fr(e.achat)}</div>
+      <div><small>Dernier contrôle</small>${e.controle ? fr(e.controle) : 'Jamais'}</div>
+      <div><small>Prochain contrôle</small>${st.prochain ? fr(iso(st.prochain)) : '—'}</div>
+      <div><small>Fin de vie</small>${st.fin ? fr(iso(st.fin)) : 'Illimitée'}</div>
+    </div>
+    ${st.niveau === 'rouge' ? `<div class="notif danger" style="margin:0 0 6px;padding:12px 14px"><div class="ni" style="width:30px;height:30px;font-size:14px">⛔</div><div>Durée de vie dépassée : cet EPI devrait être rebuté.</div></div>` : ''}
+    <div class="checks">
+      ${box('mecanisme', 'État mécanisme', 'Doigt, ressort, verrouillage, boucles, usure du métal')}
+      ${box('textile', 'État textile', 'Coutures, coupures, brûlures, usure, décoloration')}
+      ${box('general', 'État général', 'Déformations, fissures, corrosion, marquage lisible')}
+    </div>
+    <label class="f" for="cCom">Commentaire (facultatif)</label>
+    <textarea class="in" id="cCom" rows="2" placeholder="Observation éventuelle…" style="margin-bottom:14px"></textarea>
+    <div class="ctrl-btns">
+      <button class="btn success lg" id="cOk" ${tous ? '' : 'disabled'}>${ic('check')}Validé</button>
+      <button class="btn danger lg" id="cKo">${ic('trash')}Rebuté</button>
+    </div>
+    <div class="hint" style="text-align:center;margin-top:8px">${tous ? 'La date du dernier contrôle passera au ' + fr(iso(auj())) + '.' : 'Coche les 3 points pour pouvoir valider.'}</div>`;
+}
+$('#cList').onclick = e => { const b = e.target.closest('[data-row]'); if (b) selectionner(Number(b.dataset.row)); };
+$('#cMembres').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { S.c.membre = b.dataset.m; renderControle(); } };
+$('#cQ').oninput = e => { S.c.q = e.target.value; renderControle(); };
+$('#cPanel').addEventListener('change', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  const com = $('#cCom') ? $('#cCom').value : '';
+  S.c.checks[k] = e.target.checked; renderControle();
+  $('#cCom').value = com;
+});
+$('#cPanel').addEventListener('click', async e => {
+  const ok = e.target.closest('#cOk'), ko = e.target.closest('#cKo');
+  if (!ok && !ko) return;
+  const ep = epiParRow(S.c.sel); if (!ep) return;
+  if (ko && !(await confirmer('Rebuter cet EPI ?', `« ${nomEpi(ep)} » de ${ep.membre} sera retiré du service et déplacé dans la feuille Rebut.`, 'Rebuter'))) return;
+  const b = ok || ko; chargement(b, true);
+  try {
+    const j = await api('controle', {
+      row: ep.row, membre: ep.membre, epi: ep.epi, marquage: ep.marquage,
+      ...S.c.checks, commentaire: $('#cCom').value.trim(), resultat: ok ? 'valide' : 'rebut'
+    });
+    S.c.sel = null;
+    appliquer(j.data);
+    toast(ok ? `✓ ${ep.epi} de ${ep.membre} contrôlé` : `${ep.epi} de ${ep.membre} déplacé au rebut`, ok ? 'ok' : '');
+  } catch (err) { toast('Erreur : ' + err.message, 'err'); chargement(b, false); }
+});
+
+/* ---------- Rebut ---------- */
+function renderRebut() {
+  const r = S.r, q = norm(r.q);
+  const rows = DATA.rebuts.filter(e => (!r.membre || e.membre === r.membre) && (!r.type || e.epi === r.type) &&
+    (!q || norm([e.membre, e.epi, e.marque, e.designation, e.marquage, e.site].join(' ')).includes(q)))
+    .sort((a, b) => (b.dateRebut || '').localeCompare(a.dateRebut || ''));
+  $('#rCount').textContent = `${rows.length} EPI`;
+  const cols = ['Date de rebut', 'Membre', 'EPI', 'Marque', 'Désignation', 'Qté', 'Achat', "Site d'achat", 'Marquage'];
+  $('#rTable').innerHTML = '<thead><tr>' + cols.map(c => `<th style="cursor:default">${c}</th>`).join('') + '</tr></thead><tbody>' +
+    (rows.length ? rows.map(e => `<tr>
+      <td data-label="Date de rebut" class="nowrap"><span class="pill gris">${fr(e.dateRebut)}</span></td>
+      <td data-label="Membre">${avatar(e.membre)}</td>
+      <td data-label="EPI"><b>${esc(e.epi)}</b></td>
+      <td data-label="Marque">${esc(e.marque) || '—'}</td>
+      <td data-label="Désignation">${esc(e.designation) || '—'}</td>
+      <td data-label="Quantité">${esc(e.quantite)}</td>
+      <td data-label="Achat" class="nowrap">${fr(e.achat)}</td>
+      <td data-label="Site d'achat">${esc(e.site) || '—'}</td>
+      <td data-label="Marquage">${e.marquage ? `<span class="tag">${esc(e.marquage)}</span>` : '—'}</td>
+    </tr>`).join('') : `<tr><td colspan="${cols.length}"><div class="empty"><div class="big">🗑️</div>Aucun EPI rebuté.</div></td></tr>`) + '</tbody>';
+}
+$('#rQ').oninput = e => { S.r.q = e.target.value; renderRebut(); };
+$('#rMembre').onchange = e => { S.r.membre = e.target.value; renderRebut(); };
+$('#rType').onchange = e => { S.r.type = e.target.value; renderRebut(); };
+
+/* ---------- Démarrage ---------- */
+buildNav(); majBoutonTheme();
+$('#demoBar').hidden = !DEMO;
+$('#fAchat').value = iso(auj());
+if (!DEMO) { try { const c = JSON.parse(localStorage.getItem('epi-cache') || 'null'); if (c) { DATA = c; renderAll(); } } catch (e) {} }
+renderAll();
+const depart = location.hash.slice(1);
+go(PAGES.some(p => p[0] === depart) ? depart : 'accueil');
+charger();
+</script>
+</body>
+</html>

@@ -8,6 +8,8 @@
   "background_color": "#101412",
   "theme_color": "#237a3b",
   "icons": [
+    { "src": "/EPI/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/EPI/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/EPI/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

@@ -222,6 +222,10 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
 .dlg .acts{display:flex;gap:10px;justify-content:flex-end}
 .demo-bar{background:var(--accent-soft);color:var(--accent);text-align:center;font-size:13px;font-weight:600;padding:6px 12px}
 .sync{font-size:12px;color:var(--muted)}
+.net-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;padding:8px 16px;font-size:13.5px;font-weight:600;background:var(--warn-soft);color:var(--text);border-bottom:1px solid color-mix(in srgb,var(--warn-dot) 50%,transparent)}
+.net-bar.off{background:var(--surface-2)}
+.net-bar .btn{padding:6px 12px;font-size:13px}
+.wait{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:11px;font-weight:700;white-space:nowrap}
 
 /* ---------- Mobile ---------- */
 @media (max-width:900px){
@@ -277,6 +281,7 @@ nav.tabs.bottom .badge{position:absolute;top:2px;left:calc(50% + 6px)}
     </div>
   </div>
 </header>
+<div id="netBar" class="net-bar" hidden></div>
 
 <main>
   <!-- ===== ACCUEIL ===== -->
@@ -451,7 +456,7 @@ nav.tabs.bottom .badge{position:absolute;top:2px;left:calc(50% + 6px)}
    CONFIGURATION : colle ici l'URL /exec de ton Apps Script
    (laisser vide = mode démo avec des données fictives)
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycbxM8hYhsBR0Ig63xvMyoYLeb67V0RkSL-VyVQUW451RW4Y7LtnDHXAzFKWUVaXgXzrc/exec';
+const API_URL = '';
 
 const DEMO = !API_URL;
 const CONTROLE_ANS = 1; // périodicité du contrôle
@@ -518,27 +523,161 @@ function pillStatut(st) {
   return '<span class="pill ok">À jour</span>';
 }
 
-/* ---------- API ---------- */
-async function api(action, payload = {}) {
-  if (DEMO) return demoApi(action, payload);
-  let res;
-  if (action === 'all') res = await fetch(API_URL + '?action=all');
-  else res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, ...payload }) });
-  const j = await res.json();
+/* =========================================================
+   API + fonctionnement hors ligne
+   - chaque appel au serveur est abandonné au bout de 10 s
+   - les dernières données reçues sont gardées sur le téléphone
+   - un ajout ou un contrôle fait sans réseau est mis en file
+     d'attente et envoyé automatiquement au retour du réseau
+   ========================================================= */
+const TIMEOUT_MS = 10000;
+const RETRY_MS = 30000;
+const CLE_CACHE = 'epi-cache', CLE_FILE = 'epi-file';
+let BASE = { epis: [], rebuts: [], membres: [] };  // dernières données reçues du Sheet
+let FILE = lireFile();                              // enregistrements en attente d'envoi
+let horsLigne = false, retryTimer = null, envoiEnCours = null;
+
+class ErreurReseau extends Error {}
+
+function lireFile() { try { return JSON.parse(localStorage.getItem(CLE_FILE) || '[]'); } catch (e) { return []; } }
+function sauverFile() { try { localStorage.setItem(CLE_FILE, JSON.stringify(FILE)); } catch (e) {} }
+function sauverCache() {
+  if (DEMO) return;
+  try { localStorage.setItem(CLE_CACHE, JSON.stringify({ data: BASE, t: lastSync ? lastSync.getTime() : Date.now() })); } catch (e) {}
+}
+function lireCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CLE_CACHE) || 'null');
+    if (c && c.data) { BASE = c.data; lastSync = new Date(c.t); }
+    else if (c && c.epis) { BASE = c; }             // ancien format
+  } catch (e) {}
+}
+
+// Appel au serveur avec délai maximum de 10 s
+async function appel(action, payload = {}) {
+  const ctrl = new AbortController();
+  const minuteur = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let j;
+  try {
+    const res = action === 'all'
+      ? await fetch(API_URL + '?action=all&t=' + Date.now(), { signal: ctrl.signal, cache: 'no-store' })
+      : await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, ...payload }), signal: ctrl.signal });
+    j = await res.json();
+  } catch (e) {
+    throw new ErreurReseau(e.name === 'AbortError' ? 'pas de réponse en 10 s' : 'pas de réseau');
+  } finally { clearTimeout(minuteur); }
   if (!j.ok) throw new Error(j.error || 'Erreur inconnue');
   return j;
 }
-function appliquer(data) {
-  DATA = data; lastSync = new Date();
-  if (!DEMO) { try { localStorage.setItem('epi-cache', JSON.stringify(DATA)); } catch (e) {} }
+async function api(action, payload = {}) { return DEMO ? demoApi(action, payload) : appel(action, payload); }
+
+// Données affichées = données du Sheet + enregistrements encore en attente
+function recalculer() {
+  DATA = JSON.parse(JSON.stringify(BASE));
+  FILE.forEach(appliquerLocal);
   renderAll();
 }
-async function charger() {
-  const b = $('#btnRefresh'); b.classList.add('spin');
-  try { const j = await api('all'); appliquer(j.data); }
-  catch (e) { toast('Connexion impossible : ' + e.message, 'err'); }
-  finally { b.classList.remove('spin'); }
+function appliquerLocal(op) {
+  const p = op.payload;
+  if (op.action === 'ajouterEpi') {
+    const e = p.epi;
+    DATA.epis.push({ ...e, quantite: Number(e.quantite) || 1, duree: e.duree === '' ? '' : Number(e.duree), row: 'L' + op.id, attente: true });
+    if (!DATA.membres.includes(e.membre)) DATA.membres.push(e.membre);
+  } else if (op.action === 'controle') {
+    const i = DATA.epis.findIndex(e => String(e.row) === String(p.row)) >= 0
+      ? DATA.epis.findIndex(e => String(e.row) === String(p.row))
+      : DATA.epis.findIndex(e => e.membre === p.membre && e.epi === p.epi && e.marquage === p.marquage && e.marque === p.marque && e.designation === p.designation);
+    if (i < 0) return;
+    const e = DATA.epis[i];
+    if (p.resultat === 'valide') { if (!e.controle || e.controle < op.date) e.controle = op.date; e.attente = true; }
+    else {
+      const { controle, duree, row, attente, ...reste } = e;
+      DATA.rebuts.push({ ...reste, dateRebut: op.date, attente: true });
+      DATA.epis.splice(i, 1);
+    }
+  }
 }
+
+// Enregistre (ou met en attente) une action, renvoie 'envoye' | 'attente' | 'erreur'
+async function ecrire(action, payload) {
+  if (DEMO) { const j = await demoApi(action, payload); BASE = j.data; lastSync = new Date(); recalculer(); return 'envoye'; }
+  const op = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), action, date: iso(auj()), payload: { ...payload, date: iso(auj()) } };
+  FILE.push(op); sauverFile();
+  recalculer();                                     // affichage immédiat, même sans réseau
+  const erreurs = await viderFile();
+  if (erreurs[op.id]) return 'erreur';
+  return FILE.some(o => o.id === op.id) ? 'attente' : 'envoye';
+}
+
+// Envoie la file d'attente, dans l'ordre, sans doublon (chaque envoi porte un identifiant unique)
+function viderFile() {
+  if (envoiEnCours) return envoiEnCours;
+  envoiEnCours = (async () => {
+    const erreurs = {};
+    while (FILE.length) {
+      const op = FILE[0];
+      try {
+        const j = await appel(op.action, { ...op.payload, id: op.id });
+        FILE.shift(); sauverFile();
+        BASE = j.data; lastSync = new Date(); horsLigne = false; sauverCache();
+      } catch (e) {
+        if (e instanceof ErreurReseau) { horsLigne = true; planifierEssai(); break; }
+        erreurs[op.id] = e.message;                  // refus du serveur : on n'insiste pas
+        FILE.shift(); sauverFile();
+        toast('Enregistrement refusé : ' + e.message, 'err');
+      }
+    }
+    recalculer();
+    return erreurs;
+  })().finally(() => { envoiEnCours = null; });
+  return envoiEnCours;
+}
+
+function planifierEssai() {
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => charger(), RETRY_MS);
+}
+
+async function charger(manuel) {
+  if (DEMO) { const j = await demoApi('all'); BASE = j.data; lastSync = new Date(); recalculer(); return; }
+  const b = $('#btnRefresh'); b.classList.add('spin');
+  try {
+    const avaitFile = FILE.length > 0;
+    if (avaitFile) await viderFile();               // la réponse contient déjà les données à jour
+    if (FILE.length) return;                        // réseau toujours absent
+    if (!avaitFile) {
+      const j = await appel('all');
+      BASE = j.data; lastSync = new Date(); horsLigne = false; sauverCache();
+      clearTimeout(retryTimer);
+      recalculer();
+    }
+    if (manuel) toast('✓ Données à jour', 'ok');
+  } catch (e) {
+    if (e instanceof ErreurReseau) {
+      horsLigne = true; planifierEssai(); majEtat();
+      if (manuel) toast('Réseau insuffisant (' + e.message + ') : données du téléphone affichées', 'err');
+    } else toast('Erreur : ' + e.message, 'err');
+  } finally { b.classList.remove('spin'); }
+}
+
+// Bandeau d'état du réseau et de la file d'attente
+function majEtat() {
+  const quand = lastSync ? lastSync.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' à ' + lastSync.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais';
+  $('#sync').textContent = DEMO ? '' : horsLigne ? 'Hors ligne' : (lastSync ? 'Mis à jour ' + lastSync.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
+  const bar = $('#netBar');
+  if (DEMO || (!horsLigne && !FILE.length)) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.className = 'net-bar' + (horsLigne ? ' off' : '');
+  bar.innerHTML =
+    (horsLigne ? `<span>📴 Réseau insuffisant : données du téléphone (dernière mise à jour le ${quand}). Nouvel essai automatique.</span>` : '') +
+    (FILE.length ? `<span>⏳ ${FILE.length} enregistrement${FILE.length > 1 ? 's' : ''} en attente d'envoi</span>` : '') +
+    `<button class="btn" id="netRetry">Réessayer</button>`;
+}
+document.addEventListener('click', e => { if (e.target.closest('#netRetry')) charger(true); });
+window.addEventListener('online', () => charger());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && (FILE.length || horsLigne || !lastSync || Date.now() - lastSync > 60000)) charger();
+});
 
 /* ---------- Mode démo ---------- */
 let DB = null;
@@ -635,7 +774,7 @@ function chargement(btn, on) { btn.classList.toggle('loading', on); btn.disabled
 /* ---------- Rendu global ---------- */
 function renderAll() {
   renderAccueil(); renderOptions(); renderListe(); renderControle(); renderRebut();
-  $('#sync').textContent = lastSync ? 'Mis à jour ' + lastSync.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+  majEtat();
 }
 
 /* ---------- Accueil ---------- */
@@ -736,7 +875,7 @@ function renderListe() {
     <tr class="click l-${st.niveau === 'ok' ? 'ok' : st.niveau}" data-row="${e.row}" title="Contrôler cet EPI">
       <td data-label="Statut">${pillStatut(st)}</td>
       <td data-label="Membre">${avatar(e.membre)}</td>
-      <td data-label="EPI"><b>${esc(e.epi)}</b></td>
+      <td data-label="EPI"><b>${esc(e.epi)}</b>${e.attente ? '<span class="wait">⏳ à envoyer</span>' : ''}</td>
       <td data-label="Marque">${esc(e.marque) || '<span class="muted">—</span>'}</td>
       <td data-label="Désignation">${esc(e.designation) || '<span class="muted">—</span>'}</td>
       <td data-label="Quantité">${esc(e.quantite)}</td>
@@ -754,7 +893,7 @@ $('#lTable').addEventListener('click', e => {
   const th = e.target.closest('th[data-sort]');
   if (th) { const k = th.dataset.sort; S.tri = { cle: k, dir: S.tri.cle === k ? -S.tri.dir : 1 }; renderListe(); return; }
   const tr = e.target.closest('tr[data-row]');
-  if (tr) go('controle', { sel: Number(tr.dataset.row) });
+  if (tr) go('controle', { sel: tr.dataset.row });
 });
 $('#lQ').oninput = e => { S.f.q = e.target.value; renderListe(); };
 $('#lMembre').onchange = e => { S.f.membre = e.target.value; renderListe(); };
@@ -809,9 +948,9 @@ $('#fAjout').onsubmit = async ev => {
   };
   const b = $('#fSave'); chargement(b, true);
   try {
-    const j = await api('ajouterEpi', { epi: data });
-    appliquer(j.data);
-    toast(`✓ ${epi} enregistré pour ${membre}`, 'ok');
+    const r = await ecrire('ajouterEpi', { epi: data });
+    if (r === 'erreur') return;
+    toast(r === 'envoye' ? `✓ ${epi} enregistré pour ${membre}` : `⏳ ${epi} gardé sur le téléphone, envoi dès que le réseau revient`, r === 'envoye' ? 'ok' : '');
     $('#fMembre').value = membre;
     viderForm(true);
   } catch (e) { toast('Erreur : ' + e.message, 'err'); }
@@ -819,7 +958,7 @@ $('#fAjout').onsubmit = async ev => {
 };
 
 /* ---------- Contrôle ---------- */
-function epiParRow(row) { return DATA.epis.find(e => e.row === row); }
+function epiParRow(row) { return row == null ? undefined : DATA.epis.find(e => String(e.row) === String(row)); }
 function selectionner(row) {
   S.c.sel = row; S.c.checks = { mecanisme: false, textile: false, general: false };
   renderControle();
@@ -832,9 +971,9 @@ function renderControle() {
     .filter(({ e }) => (!S.c.membre || e.membre === S.c.membre) && (!q || norm([e.membre, e.epi, e.marque, e.designation, e.marquage].join(' ')).includes(q)))
     .sort((a, b) => ORDRE[a.st.niveau] - ORDRE[b.st.niveau] || (a.st.prochain || 0) - (b.st.prochain || 0));
   $('#cList').innerHTML = items.length ? items.map(({ e, st }) => `
-    <button class="ctrl-item ${S.c.sel === e.row ? 'sel' : ''}" data-row="${e.row}">
+    <button class="ctrl-item ${String(S.c.sel) === String(e.row) ? 'sel' : ''}" data-row="${e.row}">
       <span class="dot ${st.niveau}"></span>
-      <span class="main"><b>${esc(nomEpi(e))}</b><span>${esc(e.membre)}${e.marquage ? ' · ' + esc(e.marquage) : ''} · ${st.prochain ? (st.retard ? 'en retard ' + relatif(st.prochain) : 'contrôle ' + relatif(st.prochain)) : 'jamais contrôlé'}</span></span>
+      <span class="main"><b>${esc(nomEpi(e))}${e.attente ? ' <span class="wait">⏳</span>' : ''}</b><span>${esc(e.membre)}${e.marquage ? ' · ' + esc(e.marquage) : ''} · ${st.prochain ? (st.retard ? 'en retard ' + relatif(st.prochain) : 'contrôle ' + relatif(st.prochain)) : 'jamais contrôlé'}</span></span>
       ${e.marquage ? `<span class="tag">${esc(e.marquage)}</span>` : ''}
     </button>`).join('') : '<div class="empty">Aucun EPI trouvé.</div>';
 
@@ -867,7 +1006,7 @@ function renderControle() {
     </div>
     <div class="hint" style="text-align:center;margin-top:8px">${tous ? 'La date du dernier contrôle passera au ' + fr(iso(auj())) + '.' : 'Coche les 3 points pour pouvoir valider.'}</div>`;
 }
-$('#cList').onclick = e => { const b = e.target.closest('[data-row]'); if (b) selectionner(Number(b.dataset.row)); };
+$('#cList').onclick = e => { const b = e.target.closest('[data-row]'); if (b) selectionner(b.dataset.row); };
 $('#cMembres').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { S.c.membre = b.dataset.m; renderControle(); } };
 $('#cQ').oninput = e => { S.c.q = e.target.value; renderControle(); };
 $('#cPanel').addEventListener('change', e => {
@@ -883,13 +1022,14 @@ $('#cPanel').addEventListener('click', async e => {
   if (ko && !(await confirmer('Rebuter cet EPI ?', `« ${nomEpi(ep)} » de ${ep.membre} sera retiré du service et déplacé dans la feuille Rebut.`, 'Rebuter'))) return;
   const b = ok || ko; chargement(b, true);
   try {
-    const j = await api('controle', {
-      row: ep.row, membre: ep.membre, epi: ep.epi, marquage: ep.marquage,
-      ...S.c.checks, commentaire: $('#cCom').value.trim(), resultat: ok ? 'valide' : 'rebut'
-    });
     S.c.sel = null;
-    appliquer(j.data);
-    toast(ok ? `✓ ${ep.epi} de ${ep.membre} contrôlé` : `${ep.epi} de ${ep.membre} déplacé au rebut`, ok ? 'ok' : '');
+    const r = await ecrire('controle', {
+      row: ep.row, membre: ep.membre, epi: ep.epi, marquage: ep.marquage, marque: ep.marque, designation: ep.designation,
+      ...S.c.checks, commentaire: $('#cCom') ? $('#cCom').value.trim() : '', resultat: ok ? 'valide' : 'rebut'
+    });
+    if (r === 'erreur') return;
+    const quoi = ok ? `${ep.epi} de ${ep.membre} contrôlé` : `${ep.epi} de ${ep.membre} déplacé au rebut`;
+    toast(r === 'envoye' ? '✓ ' + quoi : '⏳ ' + quoi + ' (envoi dès que le réseau revient)', r === 'envoye' && ok ? 'ok' : '');
   } catch (err) { toast('Erreur : ' + err.message, 'err'); chargement(b, false); }
 });
 
@@ -905,7 +1045,7 @@ function renderRebut() {
     (rows.length ? rows.map(e => `<tr>
       <td data-label="Date de rebut" class="nowrap"><span class="pill gris">${fr(e.dateRebut)}</span></td>
       <td data-label="Membre">${avatar(e.membre)}</td>
-      <td data-label="EPI"><b>${esc(e.epi)}</b></td>
+      <td data-label="EPI"><b>${esc(e.epi)}</b>${e.attente ? '<span class="wait">⏳ à envoyer</span>' : ''}</td>
       <td data-label="Marque">${esc(e.marque) || '—'}</td>
       <td data-label="Désignation">${esc(e.designation) || '—'}</td>
       <td data-label="Quantité">${esc(e.quantite)}</td>
@@ -922,11 +1062,15 @@ $('#rType').onchange = e => { S.r.type = e.target.value; renderRebut(); };
 buildNav(); majBoutonTheme();
 $('#demoBar').hidden = !DEMO;
 $('#fAchat').value = iso(auj());
-if (!DEMO) { try { const c = JSON.parse(localStorage.getItem('epi-cache') || 'null'); if (c) { DATA = c; renderAll(); } } catch (e) {} }
-renderAll();
+if (!DEMO) lireCache();
+recalculer();                                       // affiche tout de suite les données du téléphone
 const depart = location.hash.slice(1);
 go(PAGES.some(p => p[0] === depart) ? depart : 'accueil');
 charger();
+// Page disponible même sans réseau
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
